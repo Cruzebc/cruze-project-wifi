@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerStatus { ACTIVE BLOCKED SUSPENDED }
+enum PackageType { TIME DATA TIME_DATA UNLIMITED }
+enum PaymentStatus { PENDING SUCCESS FAILED CANCELLED }
+enum SessionStatus { ACTIVE EXPIRED TERMINATED }
+enum AuditAction { LOGIN CREATE UPDATE DELETE PAYMENT_ACTIVATE EXPIRE BLOCK UNBLOCK SETTINGS }
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Package {
+  id              String      @id @default(cuid())
+  name            String
+  description     String?
+  price           Int
+  type            PackageType
+  durationMinutes Int
+  dataBytes       BigInt?
+  downloadMbps    Float?
+  uploadMbps      Float?
+  maxDevices      Int         @default(1)
+  dailyPurchaseLimit Int?
+  multiplePurchase Boolean    @default(true)
+  active          Boolean     @default(true)
+  sortOrder       Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  payments        Payment[]
+}
+
+model Customer {
+  id          String         @id @default(cuid())
+  phone       String         @unique
+  name        String?
+  macAddress  String?
+  username    String?
+  status      CustomerStatus @default(ACTIVE)
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  payments    Payment[]
+  sessions    Session[]
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  customerId     String
+  packageId      String
+  amount         Int
+  mpesaReceipt   String?       @unique
+  checkoutRequestId String?    @unique
+  merchantRequestId String?
+  phone          String
+  status         PaymentStatus @default(PENDING)
+  rawCallback    Json?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  package        Package       @relation(fields: [packageId], references: [id])
+}
+
+model Session {
+  id            String        @id @default(cuid())
+  customerId    String
+  packageName   String
+  startedAt     DateTime      @default(now())
+  expiresAt     DateTime
+  dataLimit     BigInt?
+  dataUsed      BigInt        @default(0)
+  downloadMbps  Float?
+  uploadMbps    Float?
+  status        SessionStatus @default(ACTIVE)
+  mikrotikRef   String?
+  customer      Customer      @relation(fields: [customerId], references: [id])
+}
+
+model Voucher {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  packageId   String
+  redeemed    Boolean  @default(false)
+  redeemedAt  DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  action    AuditAction
+  actor     String
+  target    String?
+  details   Json?
+  createdAt DateTime    @default(now())
+}
